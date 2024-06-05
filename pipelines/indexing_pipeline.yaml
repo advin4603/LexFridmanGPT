@@ -1,0 +1,96 @@
+components:
+  cleaner:
+    init_parameters:
+      remove_empty_lines: true
+      remove_extra_whitespaces: true
+      remove_regex: null
+      remove_repeated_substrings: false
+      remove_substrings: null
+    type: haystack.components.preprocessors.document_cleaner.DocumentCleaner
+  embedder:
+    init_parameters:
+      batch_size: 32
+      device:
+        device: cuda:0
+        type: single
+      embedding_separator: '
+
+        '
+      meta_fields_to_embed:
+      - title
+      - guest
+      model: sentence-transformers/all-MiniLM-L6-v2
+      normalize_embeddings: false
+      prefix: ''
+      progress_bar: true
+      suffix: ''
+      token:
+        env_vars:
+        - HF_API_TOKEN
+        strict: false
+        type: env_var
+      trust_remote_code: false
+    type: haystack.components.embedders.sentence_transformers_document_embedder.SentenceTransformersDocumentEmbedder
+  splitter:
+    init_parameters:
+      split_by: passage
+      split_length: 2
+      split_overlap: 0
+    type: haystack.components.preprocessors.document_splitter.DocumentSplitter
+  writer:
+    init_parameters:
+      document_store:
+        init_parameters:
+          api_key:
+            env_vars:
+            - QDRANT_API_KEY
+            strict: true
+            type: env_var
+          content_field: content
+          duplicate_documents: overwrite
+          embedding_dim: 384
+          embedding_field: embedding
+          grpc_port: 6334
+          hnsw_config: null
+          host: null
+          https: true
+          index: Document
+          init_from: null
+          location: https://758ff2fe-ce1c-45c7-9870-048a91fe7fec.us-east4-0.gcp.cloud.qdrant.io:6333
+          metadata: {}
+          name_field: name
+          on_disk: false
+          on_disk_payload: null
+          optimizers_config: null
+          path: null
+          payload_fields_to_index: null
+          port: 6333
+          prefer_grpc: false
+          prefix: null
+          progress_bar: true
+          quantization_config: null
+          recreate_index: false
+          replication_factor: null
+          return_embedding: false
+          scroll_size: 10000
+          shard_number: null
+          similarity: cosine
+          timeout: 20
+          url: null
+          use_sparse_embeddings: false
+          wait_result_from_api: true
+          wal_config: null
+          write_batch_size: 100
+          write_consistency_factor: null
+        type: haystack_integrations.document_stores.qdrant.document_store.QdrantDocumentStore
+      policy: OVERWRITE
+    type: haystack.components.writers.document_writer.DocumentWriter
+connections:
+- receiver: splitter.documents
+  sender: cleaner.documents
+- receiver: embedder.documents
+  sender: splitter.documents
+- receiver: writer.documents
+  sender: embedder.documents
+max_loops_allowed: 100
+metadata: {}

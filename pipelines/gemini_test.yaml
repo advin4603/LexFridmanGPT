@@ -1,0 +1,7 @@
+components:
+  adder:
+    init_parameters: {}
+    type: __main__.Adder
+connections: []
+max_loops_allowed: 100
+metadata: {}

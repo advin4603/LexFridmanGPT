@@ -1,0 +1,168 @@
+components:
+  documents_output:
+    init_parameters: {}
+    type: documents_output.DocumentsOutput
+  input:
+    init_parameters:
+      type_: str
+    type: haystack.components.others.multiplexer.Multiplexer
+  llm:
+    init_parameters:
+      api_key:
+        env_vars:
+        - GOOGLE_API_KEY
+        strict: true
+        type: env_var
+      generation_config: null
+      model: gemini-1.5-flash
+      safety_settings: null
+      tools: null
+    type: gemini_bugfix.GeminiBugfix
+  prompt_builder:
+    init_parameters:
+      template: "\nGiven the following information, answer the question.\n\nContext:\n\
+        {% for document in documents %}\n    Document: {{ document.id }}\n    Guest:\
+        \ {{ document.meta.guest }}\n    Title: {{ document.meta.title }}\n    {{\
+        \ document.content }}\n{% endfor %}\n\nQuestion: {{question}}\nAnswer:\n"
+    type: haystack.components.builders.prompt_builder.PromptBuilder
+  retriever:
+    init_parameters:
+      document_store:
+        init_parameters:
+          api_key:
+            env_vars:
+            - QDRANT_API_KEY
+            strict: true
+            type: env_var
+          content_field: content
+          duplicate_documents: overwrite
+          embedding_dim: 384
+          embedding_field: embedding
+          grpc_port: 6334
+          hnsw_config: null
+          host: null
+          https: true
+          index: Document
+          init_from: null
+          location: https://758ff2fe-ce1c-45c7-9870-048a91fe7fec.us-east4-0.gcp.cloud.qdrant.io:6333
+          metadata: {}
+          name_field: name
+          on_disk: false
+          on_disk_payload: null
+          optimizers_config: null
+          path: null
+          payload_fields_to_index: null
+          port: 6333
+          prefer_grpc: false
+          prefix: null
+          progress_bar: true
+          quantization_config: null
+          recreate_index: false
+          replication_factor: null
+          return_embedding: false
+          scroll_size: 10000
+          shard_number: null
+          similarity: cosine
+          timeout: 20
+          url: null
+          use_sparse_embeddings: false
+          wait_result_from_api: true
+          wal_config: null
+          write_batch_size: 100
+          write_consistency_factor: null
+        type: haystack_integrations.document_stores.qdrant.document_store.QdrantDocumentStore
+      filters: null
+      return_embedding: false
+      scale_score: true
+      top_k: 10
+    type: qdrant_bugfix.QdrantRetrieverBugfix
+  text_embedder:
+    init_parameters:
+      embedder: null
+      generator: null
+      input_label: Question
+      instruction: Given a question, generate a paragraph of text that answers the
+        question.
+      max_tokens: 400
+      n_completions: 5
+      temperature: 0.75
+    pipeline:
+      components:
+        adapter:
+          init_parameters:
+            custom_filters:
+              document_create: hyde_component.document_filter
+            output_type: typing.List[haystack.dataclasses.document.Document]
+            template: '{{answers | document_create}}'
+          type: haystack.components.converters.output_adapter.OutputAdapter
+        embedder:
+          init_parameters:
+            batch_size: 32
+            device:
+              device: cuda:0
+              type: single
+            embedding_separator: '
+
+              '
+            meta_fields_to_embed: []
+            model: sentence-transformers/all-MiniLM-L6-v2
+            normalize_embeddings: false
+            prefix: ''
+            progress_bar: true
+            suffix: ''
+            token:
+              env_vars:
+              - HF_API_TOKEN
+              strict: false
+              type: env_var
+            trust_remote_code: false
+          type: haystack.components.embedders.sentence_transformers_document_embedder.SentenceTransformersDocumentEmbedder
+        generator:
+          init_parameters:
+            api_key:
+              env_vars:
+              - GOOGLE_API_KEY
+              strict: true
+              type: env_var
+            generation_config:
+              candidate_count: 1
+              max_output_tokens: 400
+              temperature: 0.75
+            model: gemini-1.5-flash
+            safety_settings: null
+            tools: null
+          type: gemini_bugfix.GeminiBugfix
+        prompt_builder:
+          init_parameters:
+            template: 'Given a question, generate a paragraph of text that answers
+              the question.
+
+              Question: {{ query }}
+
+              Paragraph: '
+          type: haystack.components.builders.prompt_builder.PromptBuilder
+      connections:
+      - receiver: generator.parts
+        sender: prompt_builder.prompt
+      - receiver: adapter.answers
+        sender: generator.replies
+      - receiver: embedder.documents
+        sender: adapter.output
+      max_loops_allowed: 100
+      metadata: {}
+    type: hyde_component.HyDE
+connections:
+- receiver: prompt_builder.question
+  sender: input.value
+- receiver: text_embedder.query
+  sender: input.value
+- receiver: retriever.query_embedding
+  sender: text_embedder.hypothetical_embedding
+- receiver: prompt_builder.documents
+  sender: retriever.documents
+- receiver: documents_output.documents
+  sender: retriever.documents
+- receiver: llm.parts
+  sender: prompt_builder.prompt
+max_loops_allowed: 100
+metadata: {}
